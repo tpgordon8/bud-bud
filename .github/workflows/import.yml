@@ -1,0 +1,30 @@
+name: import-bud-bud
+on:
+  push:
+    paths: ['.github/workflows/import.yml']
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify files
+        run: |
+          curl -fsSL https://litter.catbox.moe/anlt2o.json -o /tmp/bundle.json
+          echo "c620931193d1d8452b8dd76f8c2b08bf0c5e538a657ac3529ecbf8e9791c43dd  /tmp/bundle.json" | sha256sum -c -
+      - name: Write files
+        run: |
+          python3 -c "
+          import json, pathlib
+          for name, text in json.load(open('/tmp/bundle.json')).items():
+              p = pathlib.Path(name); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(text)
+          "
+          git rm -q .github/workflows/import.yml
+      - name: Commit
+        run: |
+          git config user.name tpgordon8
+          git config user.email tpgordon8@users.noreply.github.com
+          git add -A
+          git commit -m "Bud Bud v2.2.3: correct thinking level for Gemini 3.8 Flash"
+          git push
