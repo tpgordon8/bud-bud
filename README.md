@@ -18,7 +18,7 @@ There is one app, in `src/index.html`, and it runs in two places:
 | GEMINI_API_KEY | Secret | Key from Google AI Studio (free tier) |
 | FORM_URL | Text | Share link to the "Bud Bud feedback" Google Form |
 | GA_ID | Text | Google Analytics measurement ID (starts with G-), optional |
-| GEMINI_MODEL | Text | Optional. Models to try in order, comma-separated. Default `gemini-3.8-flash,gemini-3.5-flash-lite` |
+| GEMINI_MODEL | Text | Optional. Models to try in order, comma-separated. Default `gemini-3.5-flash-lite,gemini-3.8-flash` (fast model first, stronger model as backup) |
 
 If Google retires a model, set `GEMINI_MODEL` to its replacement (listed at ai.google.dev/gemini-api/docs/deprecations). No code change needed.
 

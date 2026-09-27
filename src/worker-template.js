@@ -4,10 +4,10 @@
 //   GA_ID           (text)    Google Analytics measurement ID, like G-ABC123XYZ
 //   FORM_URL        (text)    link to your Google Form
 //   GEMINI_MODEL    (text, optional) comma-separated models to try in order.
-//                   Default: gemini-3.8-flash, then gemini-3.5-flash-lite if the first is busy or unavailable.
-const VERSION = '2.2.3';
+//                   Default: gemini-3.5-flash-lite (fast), then gemini-3.8-flash if the first is busy or unavailable.
+const VERSION = '2.3.0';
 const modelErrors = {}; // last refusal per model, shown on /api/health for troubleshooting
-const DEFAULT_MODELS = 'gemini-3.8-flash,gemini-3.5-flash-lite';
+const DEFAULT_MODELS = 'gemini-3.5-flash-lite,gemini-3.8-flash';
 const HTML = __HTML__;
 const PROMPT = __PROMPT__;
 const hits = new Map();

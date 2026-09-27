@@ -16,7 +16,7 @@ time.sleep(1.5)
 try:
     h = json.loads(urllib.request.urlopen(B + '/api/health').read())
     check('health: ai, analytics, feedback form readable', h['ai'] and h['analytics'] and h['feedback'], h)
-    check('health: current models configured', h['models'] == ['gemini-3.8-flash', 'gemini-3.5-flash-lite'], h)
+    check('health: current models configured', h['models'] == ['gemini-3.5-flash-lite', 'gemini-3.8-flash'], h)
     with sync_playwright() as p:
         b = p.chromium.launch()
         def page(vw=(390, 844), claude=False):
@@ -38,7 +38,7 @@ try:
         check('web: scan fills values', pg.input_value('#c-THCA') == '26.1' and pg.input_value('#f-name') == 'Gelato 41')
         g = L()['gemini'][-1]
         check('web: key stays on server', g['key'] == 'SECRET_TEST_KEY_123' and 'SECRET' not in pg.content())
-        check('web: uses newest model, low thinking, JSON mode', 'gemini-3.8-flash:' in g['url'] and g['body']['generationConfig'] == {'responseMimeType': 'application/json', 'maxOutputTokens': 4096, 'thinkingConfig': {'thinkingLevel': 'low'}}, g['body']['generationConfig'])
+        check('web: uses fast model first, minimal thinking, JSON mode', 'gemini-3.5-flash-lite:' in g['url'] and g['body']['generationConfig'] == {'responseMimeType': 'application/json', 'maxOutputTokens': 4096, 'thinkingConfig': {'thinkingLevel': 'minimal'}}, g['body']['generationConfig'])
         pg.click('#goBtn'); pg.wait_for_selector('.big', timeout=5000)
         ev = pg.evaluate("(window.dataLayer||[]).filter(a=>a[0]==='event').map(a=>a[1])")
         check('web: analytics events', all(x in ev for x in ['scan_start', 'scan_success', 'result_view']), ev)
@@ -46,10 +46,10 @@ try:
             mode(m); n0 = len(L()['gemini']); scan(pg); pg.wait_for_selector('#goBtn', timeout=10000)
             calls = [x['url'] for x in L()['gemini'][n0:]]
             he = json.loads(urllib.request.urlopen(B + '/api/health').read())['model_errors']
-            check(f'health records why first model was {label}', he.get('gemini-3.8-flash', {}).get('status') == (429 if m == 'first429' else 404), he)
-            lite = [x for x in L()['gemini'][n0:] if 'flash-lite' in x['url']]
-            check(f'web: backup model uses minimal thinking ({label})', lite and lite[0]['body']['generationConfig']['thinkingConfig'] == {'thinkingLevel': 'minimal'})
-            check(f'web: falls back to backup model when first is {label}', len(calls) == 2 and 'gemini-3.5-flash-lite:' in calls[1] and pg.input_value('#c-THCA') == '26.1', calls)
+            check(f'health records why first model was {label}', he.get('gemini-3.5-flash-lite', {}).get('status') == (429 if m == 'first429' else 404), he)
+            full = [x for x in L()['gemini'][n0:] if 'gemini-3.8-flash:' in x['url']]
+            check(f'web: backup model uses low thinking ({label})', full and full[0]['body']['generationConfig']['thinkingConfig'] == {'thinkingLevel': 'low'})
+            check(f'web: falls back to backup model when first is {label}', len(calls) == 2 and 'gemini-3.8-flash:' in calls[1] and pg.input_value('#c-THCA') == '26.1', calls)
             pg.goto(B); pg.wait_for_timeout(400)
         mode('all429'); scan(pg); pg.wait_for_timeout(2500)
         check('web: both models busy -> friendly message', 'Too many' in pg.inner_text('#view'), pg.inner_text('#view')[:150])

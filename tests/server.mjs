@@ -9,7 +9,7 @@ globalThis.fetch = async (url, opts = {}) => {
   url = String(url);
   if (url.startsWith('https://generativelanguage.googleapis.com/')) {
     log.gemini.push({url, key:opts.headers['x-goog-api-key'], body:JSON.parse(opts.body)});
-    const isFirst = url.includes('gemini-3.8-flash:');
+    const isFirst = url.includes('gemini-3.5-flash-lite:');
     if (mode === '429' || mode === 'all429') return new Response('{}', {status:429});
     if (mode === 'first429' && isFirst) return new Response('{}', {status:429});
     if (mode === 'first404' && isFirst) return new Response('{}', {status:404});
