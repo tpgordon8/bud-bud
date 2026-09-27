@@ -2,5 +2,7 @@
   "name": "bud-bud",
   "main": "worker.mjs",
   "compatibility_date": "2026-09-01",
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+"keep_vars": true,
+"vars": { "FORM_URL": "https://docs.google.com/forms/d/e/1FAIpQLSeiC5_75CxnY63PHYt-8S5SWSjg8W9ywpy8HTKWGL0gc7a98A/viewform" }
 }
