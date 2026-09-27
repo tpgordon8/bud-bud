@@ -5,7 +5,7 @@
 //   FORM_URL        (text)    link to your Google Form
 //   GEMINI_MODEL    (text, optional) comma-separated models to try in order.
 //                   Default: gemini-3.8-flash, then gemini-3.5-flash-lite if the first is busy or unavailable.
-const VERSION = '2.2.1';
+const VERSION = '2.2.2';
 const modelErrors = {}; // last refusal per model, shown on /api/health for troubleshooting
 const DEFAULT_MODELS = 'gemini-3.8-flash,gemini-3.5-flash-lite';
 const HTML = __HTML__;
@@ -34,7 +34,18 @@ export default {
     if (url.pathname === '/api/health') {
       let feedback = false;
       if (env.FORM_URL) { try { feedback = (await formInfo(env)).fields.length >= 2; } catch (e) { feedback = false; } }
-      return json({ok:true, version:VERSION, ai:!!env.GEMINI_API_KEY, models:models(env), model_errors:modelErrors, analytics:/^G-/.test(env.GA_ID || ''), feedback});
+      let probe;
+      if (url.searchParams.get('probe') === '1' && env.GEMINI_API_KEY && !limited('p:' + ip, 5, 600000)) {
+        probe = {};
+        for (const m of models(env)) {
+          try {
+            const r = await callModel(env, m, [{role:'user', parts:[{text:'Reply with {"ok":true}'}]}], false);
+            let msg = ''; if (!r.ok) { const d = await r.text(); try { msg = JSON.parse(d).error.message; } catch (e) { msg = d.slice(0, 200); } } else await r.text();
+            probe[m] = {status:r.status, message:String(msg).slice(0, 300)};
+          } catch (e) { probe[m] = {status:0, message:String(e).slice(0, 200)}; }
+        }
+      }
+      return json({ok:true, version:VERSION, ai:!!env.GEMINI_API_KEY, models:models(env), probe, model_errors:modelErrors, analytics:/^G-/.test(env.GA_ID || ''), feedback});
     }
     if (url.pathname === '/api/read' && req.method === 'POST') return read(req, env, ip);
     if (url.pathname === '/api/report' && req.method === 'POST') return report(req, env, ip);
@@ -59,15 +70,8 @@ async function read(req, env, ip){
   const contents = [{role:'user', parts}];
   const codes = [];
   for (const model of models(env)) {
-    const gen = {responseMimeType:'application/json', maxOutputTokens:4096};
-    if (model.startsWith('gemini-2.5')) { gen.temperature = 0; gen.thinkingConfig = {thinkingBudget:0}; }
-    else gen.thinkingConfig = {thinkingLevel:'minimal'};
     let up;
-    try {
-      up = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
-        method:'POST', headers:{'content-type':'application/json', 'x-goog-api-key':env.GEMINI_API_KEY},
-        body:JSON.stringify({contents, generationConfig:gen})
-      });
+    try { up = await callModel(env, model, contents, true);
     } catch (e) { codes.push(0); continue; }
     if (up.ok) { delete modelErrors[model]; return new Response(up.body, {headers:{'content-type':'text/event-stream', 'cache-control':'no-store', 'x-model':model}}); }
     const detail = (await up.text()).slice(0, 500);
@@ -79,6 +83,16 @@ async function read(req, env, ip){
   if (codes.includes(429)) return json({code:'rate_limited'}, 429);
   if (codes.length && codes.every(c => c === 400)) return json({code:'image_rejected'}, 400);
   return json({code:'upstream_error'}, 502);
+}
+function callModel(env, model, contents, stream){
+  const gen = {responseMimeType:'application/json', maxOutputTokens:4096};
+  if (model.startsWith('gemini-2.5')) { gen.temperature = 0; gen.thinkingConfig = {thinkingBudget:0}; }
+  else gen.thinkingConfig = {thinkingLevel:'minimal'};
+  const verb = stream ? 'streamGenerateContent?alt=sse' : 'generateContent';
+  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${verb}`, {
+    method:'POST', headers:{'content-type':'application/json', 'x-goog-api-key':env.GEMINI_API_KEY},
+    body:JSON.stringify({contents, generationConfig:gen})
+  });
 }
 function models(env){
   return String(env.GEMINI_MODEL || DEFAULT_MODELS).split(',').map(m => m.trim().replace(/[^a-z0-9.\-]/gi, '')).filter(Boolean).slice(0, 3);
