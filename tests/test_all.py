@@ -38,7 +38,7 @@ try:
         check('web: scan fills values', pg.input_value('#c-THCA') == '26.1' and pg.input_value('#f-name') == 'Gelato 41')
         g = L()['gemini'][-1]
         check('web: key stays on server', g['key'] == 'SECRET_TEST_KEY_123' and 'SECRET' not in pg.content())
-        check('web: uses newest model, minimal thinking, JSON mode', 'gemini-3.8-flash:' in g['url'] and g['body']['generationConfig'] == {'responseMimeType': 'application/json', 'maxOutputTokens': 4096, 'thinkingConfig': {'thinkingLevel': 'minimal'}}, g['body']['generationConfig'])
+        check('web: uses newest model, low thinking, JSON mode', 'gemini-3.8-flash:' in g['url'] and g['body']['generationConfig'] == {'responseMimeType': 'application/json', 'maxOutputTokens': 4096, 'thinkingConfig': {'thinkingLevel': 'low'}}, g['body']['generationConfig'])
         pg.click('#goBtn'); pg.wait_for_selector('.big', timeout=5000)
         ev = pg.evaluate("(window.dataLayer||[]).filter(a=>a[0]==='event').map(a=>a[1])")
         check('web: analytics events', all(x in ev for x in ['scan_start', 'scan_success', 'result_view']), ev)
@@ -47,6 +47,8 @@ try:
             calls = [x['url'] for x in L()['gemini'][n0:]]
             he = json.loads(urllib.request.urlopen(B + '/api/health').read())['model_errors']
             check(f'health records why first model was {label}', he.get('gemini-3.8-flash', {}).get('status') == (429 if m == 'first429' else 404), he)
+            lite = [x for x in L()['gemini'][n0:] if 'flash-lite' in x['url']]
+            check(f'web: backup model uses minimal thinking ({label})', lite and lite[0]['body']['generationConfig']['thinkingConfig'] == {'thinkingLevel': 'minimal'})
             check(f'web: falls back to backup model when first is {label}', len(calls) == 2 and 'gemini-3.5-flash-lite:' in calls[1] and pg.input_value('#c-THCA') == '26.1', calls)
             pg.goto(B); pg.wait_for_timeout(400)
         mode('all429'); scan(pg); pg.wait_for_timeout(2500)

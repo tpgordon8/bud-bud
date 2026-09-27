@@ -5,7 +5,7 @@
 //   FORM_URL        (text)    link to your Google Form
 //   GEMINI_MODEL    (text, optional) comma-separated models to try in order.
 //                   Default: gemini-3.8-flash, then gemini-3.5-flash-lite if the first is busy or unavailable.
-const VERSION = '2.2.2';
+const VERSION = '2.2.3';
 const modelErrors = {}; // last refusal per model, shown on /api/health for troubleshooting
 const DEFAULT_MODELS = 'gemini-3.8-flash,gemini-3.5-flash-lite';
 const HTML = __HTML__;
@@ -87,7 +87,8 @@ async function read(req, env, ip){
 function callModel(env, model, contents, stream){
   const gen = {responseMimeType:'application/json', maxOutputTokens:4096};
   if (model.startsWith('gemini-2.5')) { gen.temperature = 0; gen.thinkingConfig = {thinkingBudget:0}; }
-  else gen.thinkingConfig = {thinkingLevel:'minimal'};
+  // Flash-Lite models accept 'minimal'; full Flash models (3.8+) require at least 'low'.
+  else gen.thinkingConfig = {thinkingLevel: model.includes('lite') ? 'minimal' : 'low'};
   const verb = stream ? 'streamGenerateContent?alt=sse' : 'generateContent';
   return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${verb}`, {
     method:'POST', headers:{'content-type':'application/json', 'x-goog-api-key':env.GEMINI_API_KEY},
