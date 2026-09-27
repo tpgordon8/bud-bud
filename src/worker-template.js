@@ -5,7 +5,8 @@
 //   FORM_URL        (text)    link to your Google Form
 //   GEMINI_MODEL    (text, optional) comma-separated models to try in order.
 //                   Default: gemini-3.8-flash, then gemini-3.5-flash-lite if the first is busy or unavailable.
-const VERSION = '2.2.0';
+const VERSION = '2.2.1';
+const modelErrors = {}; // last refusal per model, shown on /api/health for troubleshooting
 const DEFAULT_MODELS = 'gemini-3.8-flash,gemini-3.5-flash-lite';
 const HTML = __HTML__;
 const PROMPT = __PROMPT__;
@@ -33,7 +34,7 @@ export default {
     if (url.pathname === '/api/health') {
       let feedback = false;
       if (env.FORM_URL) { try { feedback = (await formInfo(env)).fields.length >= 2; } catch (e) { feedback = false; } }
-      return json({ok:true, version:VERSION, ai:!!env.GEMINI_API_KEY, models:models(env), analytics:/^G-/.test(env.GA_ID || ''), feedback});
+      return json({ok:true, version:VERSION, ai:!!env.GEMINI_API_KEY, models:models(env), model_errors:modelErrors, analytics:/^G-/.test(env.GA_ID || ''), feedback});
     }
     if (url.pathname === '/api/read' && req.method === 'POST') return read(req, env, ip);
     if (url.pathname === '/api/report' && req.method === 'POST') return report(req, env, ip);
@@ -68,8 +69,11 @@ async function read(req, env, ip){
         body:JSON.stringify({contents, generationConfig:gen})
       });
     } catch (e) { codes.push(0); continue; }
-    if (up.ok) return new Response(up.body, {headers:{'content-type':'text/event-stream', 'cache-control':'no-store', 'x-model':model}});
-    console.log('gemini error', model, up.status, (await up.text()).slice(0, 500));
+    if (up.ok) { delete modelErrors[model]; return new Response(up.body, {headers:{'content-type':'text/event-stream', 'cache-control':'no-store', 'x-model':model}}); }
+    const detail = (await up.text()).slice(0, 500);
+    console.log('gemini error', model, up.status, detail);
+    let msg = detail; try { msg = JSON.parse(detail).error.message || detail; } catch (e) {}
+    modelErrors[model] = {status:up.status, message:String(msg).replace(/AIza[0-9A-Za-z_\-]{20,}/g, '[key]').slice(0, 300), at:new Date().toISOString()};
     codes.push(up.status);
   }
   if (codes.includes(429)) return json({code:'rate_limited'}, 429);

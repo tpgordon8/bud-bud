@@ -45,6 +45,8 @@ try:
         for m, label in [('first429', 'busy'), ('first404', 'unavailable')]:
             mode(m); n0 = len(L()['gemini']); scan(pg); pg.wait_for_selector('#goBtn', timeout=10000)
             calls = [x['url'] for x in L()['gemini'][n0:]]
+            he = json.loads(urllib.request.urlopen(B + '/api/health').read())['model_errors']
+            check(f'health records why first model was {label}', he.get('gemini-3.8-flash', {}).get('status') == (429 if m == 'first429' else 404), he)
             check(f'web: falls back to backup model when first is {label}', len(calls) == 2 and 'gemini-3.5-flash-lite:' in calls[1] and pg.input_value('#c-THCA') == '26.1', calls)
             pg.goto(B); pg.wait_for_timeout(400)
         mode('all429'); scan(pg); pg.wait_for_timeout(2500)
